@@ -1,0 +1,47 @@
+name: Sonar
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    name: Sonar
+    runs-on: windows-latest
+    env:
+      BUILD_WRAPPER_OUT_DIR: build_wrapper_output_directory # Directory where build-wrapper output will be placed
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install OpenCppCoverage # Needed to generate coverage
+        run: |
+          curl -L https://github.com/OpenCppCoverage/OpenCppCoverage/releases/download/release-0.9.7.0/OpenCppCoverageSetup-x64-0.9.7.0.exe -o OpenCppCoverageSetup.exe
+          Start-Process -FilePath .\OpenCppCoverageSetup.exe -ArgumentList "/SUPRESSMSGBOXES /NORESTART /VERYSILENT" -NoNewWindow -Wait
+
+      - name: Install sonar-scanner and build-wrapper
+        uses: SonarSource/sonarcloud-github-c-cpp@v2
+
+      - name: Run build-wrapper
+        run: |
+          New-Item -ItemType directory -Path build
+          cmake -S . -B build
+          build-wrapper-win-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build build/ --config RelWithDebInfo
+      
+      - name: Run tests with coverage
+        run: |
+          &"C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --cover_children --sources=$(pwd) "--export_type=cobertura:cobertura.xml" -- build\test\RelWithDebInfo\tiny_dnn_test.exe
+
+      - name: Print XML file content
+        run: |
+          cat cobertura.xml
+      
+      - name: Run sonar-scanner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Put the name of your token here
+        run: |
+          sonar-scanner --define sonar.cfamily.build-wrapper-output="${{ env.BUILD_WRAPPER_OUT_DIR }}" --define sonar.cfamily.cobertura.reportPaths="cobertura.xml"
