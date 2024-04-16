@@ -1,0 +1,47 @@
+name: Coverage
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    name: Coverage
+    runs-on: windows-latest
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows-release
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install OpenCppCoverage # Needed to generate coverage
+        run: |
+          curl -L https://github.com/OpenCppCoverage/OpenCppCoverage/releases/download/release-0.9.7.0/OpenCppCoverageSetup-x64-0.9.7.0.exe -o OpenCppCoverageSetup.exe
+          Start-Process -FilePath .\OpenCppCoverageSetup.exe -ArgumentList "/SUPRESSMSGBOXES /NORESTART /VERYSILENT" -NoNewWindow -Wait
+
+      - name: Run build-wrapper
+        run: |
+          New-Item -ItemType directory -Path build
+          cmake -S . -B build
+          cmake --build build/ --config Debug
+      
+      - name: Run tests with coverage
+        run: |
+          cd build
+          &"C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --cover_children --excluded_sources vctools --excluded_sources test --excluded_sources "Program Files" --excluded_sources ExternalAPIs "--export_type=cobertura:cobertura.xml" -- ctest -j4 -C Debug
+      - name: Print XML file content
+        run: |
+          cat build/cobertura.xml
+      
+      - name: Code Coverage Report
+        uses: clearlyip/code-coverage-report-action@v4
+        with:
+            filename: build/cobertura.xml
+            badge: true
+            overall_coverage_fail_threshold: 10
+
