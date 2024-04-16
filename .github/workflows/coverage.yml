@@ -27,21 +27,21 @@ jobs:
       - name: Run build-wrapper
         run: |
           New-Item -ItemType directory -Path build
-          cmake -S . -B build
-          cmake --build build/ --config Debug
+          cmake -S . -B build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build/ --config RelWithDebInfo
       
       - name: Run tests with coverage
         run: |
-          cd build
-          &"C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --cover_children --excluded_sources vctools --excluded_sources test --excluded_sources "Program Files" --excluded_sources ExternalAPIs "--export_type=cobertura:cobertura.xml" -- ctest -j4 -C Debug
+          cd build/test
+          &"C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --cover_children --excluded_sources vctools --excluded_sources test --excluded_sources "Program Files" --excluded_sources ExternalAPIs "--export_type=cobertura:cobertura.xml" -- ctest -j4 -C RelWithDebInfo
       - name: Print XML file content
         run: |
-          cat build/cobertura.xml
+          cat build/test/cobertura.xml
       
       - name: Code Coverage Report
         uses: clearlyip/code-coverage-report-action@v4
         with:
-            filename: build/cobertura.xml
+            filename: build/test/cobertura.xml
             badge: true
             overall_coverage_fail_threshold: 10
 
